@@ -114,6 +114,19 @@ class Store {
         localStorage.setItem(this.historyKey, JSON.stringify(this.history));
     }
 
+    // --- ACTIVE WORKOUT PERSISTENCE ---
+    saveActiveWorkout(data) {
+        localStorage.setItem(`neon_active_workout_${this.profileId}`, JSON.stringify(data));
+    }
+
+    getActiveWorkout() {
+        return JSON.parse(localStorage.getItem(`neon_active_workout_${this.profileId}`));
+    }
+
+    clearActiveWorkout() {
+        localStorage.removeItem(`neon_active_workout_${this.profileId}`);
+    }
+
     addPlan(plan) {
         this.plans.push(plan);
         this.savePlans();
@@ -215,7 +228,20 @@ class App {
     loadProfile(profileId) {
         this.profileManager.setCurrentProfile(profileId);
         this.store = new Store(profileId);
-        this.router.navigate('home');
+
+        // Check for active workout to resume
+        const savedWorkout = this.store.getActiveWorkout();
+        if (savedWorkout) {
+            if (confirm(`Resume unfinished workout "${savedWorkout.planName}"?`)) {
+                this.resumeWorkout(savedWorkout);
+            } else {
+                this.store.clearActiveWorkout();
+                this.router.navigate('home');
+            }
+        } else {
+            this.router.navigate('home');
+        }
+
         console.log(`Loaded Profile: ${profileId}`);
     }
 
@@ -474,6 +500,7 @@ class App {
         const plan = this.store.getPlan(planId);
         if (!plan) return;
 
+        // Start fresh
         this.currentWorkout = {
             planId: plan.id,
             startTime: new Date(),
@@ -481,22 +508,70 @@ class App {
             exercises: plan.exercises
         };
 
+        // Initial Save
+        this.store.saveActiveWorkout(this.currentWorkout);
+
+        this.renderWorkoutView();
+    }
+
+    resumeWorkout(savedData) {
+        this.currentWorkout = {
+            ...savedData,
+            startTime: new Date(savedData.startTime) // Restore object
+        };
+        this.renderWorkoutView();
+    }
+
+    redoWorkout(logId) {
+        const log = this.store.history.find(l => l.id === logId);
+        if (!log) return;
+
+        // Convert history log back to "active workout" structure
+        // We need to map the historically performed sets to the "default" values for this session
+        // so they appear pre-filled
+
+        const exercises = log.exercises.map(ex => ({
+            id: generateId(),
+            name: ex.name,
+            defaultSets: ex.sets.length,
+            // We'll store the exact sets to pre-fill active values
+            prefillSets: ex.sets
+        }));
+
+        this.currentWorkout = {
+            planId: log.planId || 'redo', // Might not exist anymore, fine
+            startTime: new Date(),
+            planName: log.planName,
+            exercises: exercises
+        };
+
+        this.store.saveActiveWorkout(this.currentWorkout);
+        this.renderWorkoutView();
+    }
+
+    renderWorkoutView() {
         const container = document.getElementById('workout-exercises-list');
-        document.getElementById('workout-title').textContent = plan.name;
+        document.getElementById('workout-title').textContent = this.currentWorkout.planName;
         document.getElementById('workout-timer').textContent = "00:00";
 
         container.innerHTML = '';
 
-        plan.exercises.forEach(ex => {
+        this.currentWorkout.exercises.forEach(ex => {
             const card = document.createElement('div');
             card.className = 'card workout-exercise-card';
             card.dataset.id = ex.id;
             card.dataset.name = ex.name;
 
             let setsHtml = '';
-            for (let i = 1; i <= (ex.defaultSets || 3); i++) {
-                setsHtml += this.generateSetRowHtml(i);
-            }
+            // Determine sets to render: either from prefill (Redo), saved state (Resume), or default (New)
+            const setsToRender = ex.sets || ex.prefillSets || Array(ex.defaultSets || 3).fill({ weight: '', reps: '' });
+
+            setsToRender.forEach((set, i) => {
+                // Clean up data for display (handle 0s or empty strings)
+                const w = (set.weight !== undefined && set.weight !== '') ? set.weight : '';
+                const r = (set.reps !== undefined && set.reps !== '') ? set.reps : '';
+                setsHtml += this.generateSetRowHtml(i + 1, w, r);
+            });
 
             card.innerHTML = `
                 <div class="workout-card-header" style="margin-bottom:12px; display:flex; justify-content:space-between; align-items:center;">
@@ -523,18 +598,61 @@ class App {
             container.appendChild(card);
         });
 
+        // Attach auto-save listeners
+        container.querySelectorAll('input').forEach(input => {
+            input.addEventListener('input', () => this.saveWorkoutState());
+        });
+
         this.router.navigate('workout');
     }
 
-    generateSetRowHtml(setNumber) {
+    saveWorkoutState() {
+        if (!this.currentWorkout) return;
+
+        // Scrape DOM for current state
+        const exercises = [];
+        const cards = document.querySelectorAll('.workout-exercise-card');
+
+        cards.forEach(card => {
+            const exerciseName = card.dataset.name;
+            const id = card.dataset.id;
+            const sets = [];
+
+            card.querySelectorAll('.set-row').forEach(row => {
+                const weight = row.querySelector('.set-weight').value;
+                const reps = row.querySelector('.set-reps').value;
+                // Save raw values to restore exactly
+                sets.push({ weight, reps });
+            });
+
+            exercises.push({
+                id: id,
+                name: exerciseName,
+                sets: sets
+            });
+        });
+
+        // Update memory
+        this.currentWorkout.exercises = exercises;
+
+        // Save to disk
+        this.store.saveActiveWorkout(this.currentWorkout);
+    }
+
+    generateSetRowHtml(setNumber, weight = '', reps = '') {
         return `
             <div class="set-row" style="display:grid; grid-template-columns: 40px 1fr 1fr 40px; gap:8px; margin-bottom:8px; align-items:center;">
                 <span class="set-num" style="color:var(--text-secondary); font-weight:600;">${setNumber}</span>
-                <input type="number" class="set-weight" placeholder="kg">
-                <input type="number" class="set-reps" placeholder="Reps">
-                <button class="btn btn-icon" style="color:var(--danger-color); font-size:20px;" onclick="this.closest('.set-row').remove()"><i class="ph ph-x"></i></button>
+                <input type="number" class="set-weight" placeholder="kg" value="${weight}">
+                <input type="number" class="set-reps" placeholder="Reps" value="${reps}">
+                <button class="btn btn-icon" style="color:var(--danger-color); font-size:20px;" onclick="app.removeSet(this)"><i class="ph ph-x"></i></button>
             </div>
         `;
+    }
+
+    removeSet(btn) {
+        btn.closest('.set-row').remove();
+        this.saveWorkoutState(); // Trigger save on structural change
     }
 
     addSetToExercise(btn) {
@@ -542,6 +660,12 @@ class App {
         const currentSets = setsList.querySelectorAll('.set-row').length;
         const html = this.generateSetRowHtml(currentSets + 1);
         setsList.insertAdjacentHTML('beforeend', html);
+
+        // Attach listener to new inputs
+        const newRow = setsList.lastElementChild;
+        newRow.querySelectorAll('input').forEach(i => i.addEventListener('input', () => this.saveWorkoutState()));
+
+        this.saveWorkoutState();
     }
 
     finishWorkout() {
@@ -579,12 +703,14 @@ class App {
         });
 
         this.store.addWorkoutLog(log);
+        this.store.clearActiveWorkout(); // DONE
         this.currentWorkout = null;
         this.router.navigate('history');
     }
 
     discardWorkout() {
         if (confirm('Discard current workout? Data will be lost.')) {
+            this.store.clearActiveWorkout(); // CLEARED
             this.currentWorkout = null;
             this.router.navigate('home');
         }
@@ -631,6 +757,11 @@ class App {
 
             const card = document.createElement('div');
             card.className = 'card';
+            card.onclick = (e) => {
+                // Prevent triggering if clicked on inner elements like specific buttons if we had them
+                // For now, whole card clickable for "Redo" or just add a button
+            };
+
             card.innerHTML = `
                 <div class="history-card-header" style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
                     <h3>${log.planName}</h3>
@@ -638,6 +769,11 @@ class App {
                 </div>
                 <div class="history-content">
                     ${exercisesHtml}
+                </div>
+                <div style="margin-top:12px; border-top:1px solid rgba(255,255,255,0.05); padding-top:8px;">
+                     <button class="btn btn-outline full-width" style="font-size:12px; padding:8px;" onclick="app.redoWorkout('${log.id}')">
+                        <i class="ph ph-arrow-counter-clockwise"></i> Redo this Workout
+                     </button>
                 </div>
             `;
             container.appendChild(card);
