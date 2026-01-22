@@ -564,27 +564,30 @@ class App {
 
             let setsHtml = '';
             // Determine sets to render: either from prefill (Redo), saved state (Resume), or default (New)
-            const setsToRender = ex.sets || ex.prefillSets || Array(ex.defaultSets || 3).fill({ weight: '', reps: '' });
+            const setsToRender = ex.sets || ex.prefillSets || Array(ex.defaultSets || 3).fill({
+                weight: '',
+                reps: '',
+                completed: false
+            });
 
             setsToRender.forEach((set, i) => {
                 // Clean up data for display (handle 0s or empty strings)
                 const w = (set.weight !== undefined && set.weight !== '') ? set.weight : '';
                 const r = (set.reps !== undefined && set.reps !== '') ? set.reps : '';
-                setsHtml += this.generateSetRowHtml(i + 1, w, r);
+                const c = (set.completed === true);
+                setsHtml += this.generateSetRowHtml(i + 1, w, r, c);
             });
 
             card.innerHTML = `
                 <div class="workout-card-header" style="margin-bottom:12px; display:flex; justify-content:space-between; align-items:center;">
                     <h3>${ex.name}</h3>
-                    <button class="btn btn-icon btn-check-exercise" onclick="this.closest('.card').classList.toggle('completed')">
-                        <i class="ph ph-check-circle" style="font-size:28px;"></i>
-                    </button>
                 </div>
                 <div class="sets-container">
-                    <div style="display:grid; grid-template-columns: 40px 1fr 1fr 40px; gap:8px; margin-bottom:8px; color:var(--text-secondary); font-size:12px; text-transform:uppercase;">
+                    <div style="display:grid; grid-template-columns: 30px 1fr 1fr 30px 40px; gap:8px; margin-bottom:8px; color:var(--text-secondary); font-size:12px; text-transform:uppercase; text-align:center;">
                         <span>Set</span>
                         <span>kg</span>
                         <span>Reps</span>
+                        <span><i class="ph ph-check"></i></span>
                         <span></span>
                     </div>
                     <div class="sets-list">
@@ -621,8 +624,13 @@ class App {
             card.querySelectorAll('.set-row').forEach(row => {
                 const weight = row.querySelector('.set-weight').value;
                 const reps = row.querySelector('.set-reps').value;
+                const completed = row.classList.contains('completed');
                 // Save raw values to restore exactly
-                sets.push({ weight, reps });
+                sets.push({
+                    weight,
+                    reps,
+                    completed
+                });
             });
 
             exercises.push({
@@ -639,15 +647,42 @@ class App {
         this.store.saveActiveWorkout(this.currentWorkout);
     }
 
-    generateSetRowHtml(setNumber, weight = '', reps = '') {
+    generateSetRowHtml(setNumber, weight = '', reps = '', completed = false) {
+        const completedClass = completed ? 'completed' : '';
+        const btnClass = completed ? 'btn-success' : 'btn-secondary';
+        const icon = completed ? 'ph-check-bold' : 'ph-check';
+
         return `
-            <div class="set-row" style="display:grid; grid-template-columns: 40px 1fr 1fr 40px; gap:8px; margin-bottom:8px; align-items:center;">
-                <span class="set-num" style="color:var(--text-secondary); font-weight:600;">${setNumber}</span>
+            <div class="set-row ${completedClass}" style="display:grid; grid-template-columns: 30px 1fr 1fr 30px 40px; gap:8px; margin-bottom:8px; align-items:center;">
+                <span class="set-num" style="color:var(--text-secondary); font-weight:600; text-align:center;">${setNumber}</span>
                 <input type="number" class="set-weight" placeholder="kg" value="${weight}">
                 <input type="number" class="set-reps" placeholder="Reps" value="${reps}">
+                <button class="btn ${btnClass} btn-icon btn-sm" style="width:30px; height:30px; padding:0; display:flex; align-items:center; justify-content:center;" onclick="app.toggleSetComplete(this)">
+                    <i class="ph ${icon}" style="font-size:16px;"></i>
+                </button>
                 <button class="btn btn-icon" style="color:var(--danger-color); font-size:20px;" onclick="app.removeSet(this)"><i class="ph ph-x"></i></button>
             </div>
         `;
+    }
+
+    toggleSetComplete(btn) {
+        const row = btn.closest('.set-row');
+        const wasCompleted = row.classList.contains('completed');
+
+        if (wasCompleted) {
+            row.classList.remove('completed');
+            btn.classList.remove('btn-success');
+            btn.classList.add('btn-secondary');
+            btn.querySelector('i').classList.replace('ph-check-bold', 'ph-check');
+        } else {
+            row.classList.add('completed');
+            btn.classList.remove('btn-secondary');
+            btn.classList.add('btn-success');
+            btn.querySelector('i').classList.replace('ph-check', 'ph-check-bold');
+        }
+
+        // Explicit Save
+        this.saveWorkoutState();
     }
 
     removeSet(btn) {
