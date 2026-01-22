@@ -132,6 +132,14 @@ class Store {
         this.savePlans();
     }
 
+    updatePlan(updatedPlan) {
+        const index = this.plans.findIndex(p => p.id === updatedPlan.id);
+        if (index !== -1) {
+            this.plans[index] = updatedPlan;
+            this.savePlans();
+        }
+    }
+
     deletePlan(planId) {
         this.plans = this.plans.filter(p => p.id !== planId);
         this.savePlans();
@@ -139,6 +147,11 @@ class Store {
 
     addWorkoutLog(log) {
         this.history.unshift(log); // Add to beginning
+        this.saveHistory();
+    }
+
+    deleteWorkoutLog(id) {
+        this.history = this.history.filter(h => h.id !== id);
         this.saveHistory();
     }
 
@@ -229,18 +242,9 @@ class App {
         this.profileManager.setCurrentProfile(profileId);
         this.store = new Store(profileId);
 
-        // Check for active workout to resume
-        const savedWorkout = this.store.getActiveWorkout();
-        if (savedWorkout) {
-            if (confirm(`Resume unfinished workout "${savedWorkout.planName}"?`)) {
-                this.resumeWorkout(savedWorkout);
-            } else {
-                this.store.clearActiveWorkout();
-                this.router.navigate('home');
-            }
-        } else {
-            this.router.navigate('home');
-        }
+        // No blocking prompt. Just go home.
+        // The renderPlansList will handle showing the active workout.
+        this.router.navigate('home');
 
         console.log(`Loaded Profile: ${profileId}`);
     }
@@ -325,6 +329,9 @@ class App {
         // --- WORKOUT LISTENERS ---
         document.getElementById('btn-finish-workout')?.addEventListener('click', () => this.finishWorkout());
         document.getElementById('btn-discard-workout')?.addEventListener('click', () => this.discardWorkout());
+        document.getElementById('btn-save-exit')?.addEventListener('click', () => {
+            this.router.navigate('home');
+        });
     }
 
     setupProfileView() {
@@ -383,15 +390,45 @@ class App {
     // --- PLAN MANAGEMENT ---
 
     renderPlansList() {
-        const container = document.getElementById('plans-list');
-        if (!container) return;
+        const plansContainer = document.getElementById('plans-list');
+        const activeContainer = document.getElementById('active-workout-container');
+
+        if (!plansContainer || !activeContainer) return;
         if (!this.store) return; // Guard
 
-        container.innerHTML = '';
+        plansContainer.innerHTML = '';
+        activeContainer.innerHTML = '';
+
+        // Check for active workout
+        const active = this.store.getActiveWorkout();
+        if (active) {
+            activeContainer.style.display = 'block';
+            const activeCard = document.createElement('div');
+            activeCard.className = 'card';
+            activeCard.style.border = '1px solid var(--primary-color)';
+            activeCard.style.background = 'rgba(0, 240, 255, 0.05)';
+            activeCard.innerHTML = `
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
+                    <div>
+                        <span style="font-size:10px; text-transform:uppercase; letter-spacing:1px; color:var(--primary-color); font-weight:bold;">Active Session</span>
+                        <h3 style="margin-top:4px;">${active.planName}</h3>
+                    </div>
+                    <div style="width:10px; height:10px; background:var(--primary-color); border-radius:50%; box-shadow:0 0 10px var(--primary-color);"></div>
+                </div>
+                <div style="display:flex; gap:8px;">
+                    <button class="btn btn-primary full-width" onclick="app.resumeWorkout(app.store.getActiveWorkout())">Resume</button>
+                    <button class="btn btn-secondary full-width" onclick="app.finishActiveWorkoutFromHome()">Finish</button>
+                </div>
+            `;
+            activeContainer.appendChild(activeCard);
+        } else {
+            activeContainer.style.display = 'none';
+        }
+
         const plans = this.store.plans;
 
         if (plans.length === 0) {
-            container.innerHTML = `
+            plansContainer.innerHTML = `
                 <div class="empty-state">
                     <p>No workout plans yet.</p>
                     <button class="btn btn-primary" onclick="app.router.navigate('plan-editor')">Create First Plan</button>
@@ -407,6 +444,7 @@ class App {
                 <div class="plan-card-header" style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
                     <h3>${plan.name}</h3>
                     <div class="plan-actions">
+                         <button class="btn btn-icon" onclick="app.openPlanEditor('${plan.id}')"><i class="ph ph-pencil-simple"></i></button>
                          <button class="btn btn-icon" onclick="app.deletePlan('${plan.id}')"><i class="ph ph-trash"></i></button>
                          <button class="btn btn-primary" style="padding: 8px 16px; font-size: 12px;" onclick="app.startWorkout('${plan.id}')">Start</button>
                     </div>
@@ -416,14 +454,31 @@ class App {
                     ${plan.exercises.map(e => e.name).slice(0, 3).join(', ')}${plan.exercises.length > 3 ? '...' : ''}
                 </div>
             `;
-            container.appendChild(card);
+            plansContainer.appendChild(card);
         });
     }
 
     openPlanEditor(planId = null) {
-        document.getElementById('plan-name').value = '';
+        const titleEl = document.querySelector('#view-plan-editor h3'); // We might need to make this ID specific if generic
+
         document.getElementById('editor-exercises-list').innerHTML = '';
-        this.addExerciseToEditor();
+
+        if (planId) {
+            const plan = this.store.getPlan(planId);
+            if (plan) {
+                document.getElementById('plan-name').value = plan.name;
+                document.getElementById('plan-name').dataset.editingId = plan.id; // Store ID
+
+                plan.exercises.forEach(ex => {
+                    this.addExerciseToEditor({ name: ex.name, sets: ex.defaultSets });
+                });
+            }
+        } else {
+            document.getElementById('plan-name').value = '';
+            delete document.getElementById('plan-name').dataset.editingId;
+            this.addExerciseToEditor();
+        }
+
         this.router.navigate('plan-editor');
     }
 
@@ -476,14 +531,21 @@ class App {
             return;
         }
 
+        const editingId = document.getElementById('plan-name').dataset.editingId;
+
         const newPlan = {
-            id: generateId(),
+            id: editingId || generateId(),
             name: name,
             exercises: exercises,
             createdAt: new Date().toISOString()
         };
 
-        this.store.addPlan(newPlan);
+        if (editingId) {
+            this.store.updatePlan(newPlan);
+        } else {
+            this.store.addPlan(newPlan);
+        }
+
         this.router.navigate('home');
     }
 
@@ -547,6 +609,23 @@ class App {
 
         this.store.saveActiveWorkout(this.currentWorkout);
         this.renderWorkoutView();
+    }
+
+    finishActiveWorkoutFromHome() {
+        const active = this.store.getActiveWorkout();
+        if (active) {
+            this.currentWorkout = active;
+            // Ensure sets are properly formatted if needed, though they should be fine from storage
+            // Just assume they are valid or filter empty ones like in finishWorkout
+            this.finishWorkout();
+        }
+    }
+
+    deleteLog(id) {
+        if (confirm("Are you sure you want to delete this workout history?")) {
+            this.store.deleteWorkoutLog(id);
+            this.renderHistoryList();
+        }
     }
 
     renderWorkoutView() {
@@ -799,8 +878,11 @@ class App {
 
             card.innerHTML = `
                 <div class="history-card-header" style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
-                    <h3>${log.planName}</h3>
-                    <span style="font-size:12px; color:var(--text-secondary);">${dateStr}</span>
+                    <div>
+                        <h3>${log.planName}</h3>
+                        <span style="font-size:12px; color:var(--text-secondary);">${dateStr}</span>
+                    </div>
+                    <button class="btn btn-icon" style="color:var(--text-secondary); font-size: 20px;" onclick="event.stopPropagation(); app.deleteLog('${log.id}')"><i class="ph ph-trash"></i></button>
                 </div>
                 <div class="history-content">
                     ${exercisesHtml}

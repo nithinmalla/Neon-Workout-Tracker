@@ -42,6 +42,10 @@
                     <p class="date-display">Today</p>
                 </div>
 
+                <div id="active-workout-container" class="cards-container" style="margin-bottom: 24px;">
+                    <!-- Active workout will be injected here -->
+                </div>
+
                 <div class="section-header">
                     <h3>Your Plans</h3>
                     <button class="btn btn-icon" id="btn-create-plan" aria-label="Create Plan">
@@ -104,8 +108,11 @@
             </div>
 
             <div class="floating-action-bar">
-                <button class="btn btn-danger" id="btn-discard-workout">Discard</button>
-                <button class="btn btn-success" id="btn-finish-workout">Finish</button>
+                <button class="btn btn-secondary" id="btn-save-exit">Save & Exit</button>
+                <div style="flex:1; display:flex; gap:8px;">
+                    <button class="btn btn-danger" id="btn-discard-workout" style="flex:1;">Discard</button>
+                    <button class="btn btn-success" id="btn-finish-workout" style="flex:1;">Finish</button>
+                </div>
             </div>
         </section>
 
