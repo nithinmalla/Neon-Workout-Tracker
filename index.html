@@ -45,6 +45,28 @@
                     <p class="date-display">Today</p>
                 </div>
 
+                <!-- Calendar Widget -->
+                <div id="calendar-widget" class="card" style="margin-bottom: 24px;">
+                    <div class="calendar-header">
+                        <div class="calendar-nav">
+                            <span id="calendar-month-year">January 2026</span>
+                            <div class="calendar-controls">
+                                <button id="prev-month" class="btn-icon-sm"><i class="ph ph-caret-left"></i></button>
+                                <button id="next-month" class="btn-icon-sm"><i class="ph ph-caret-right"></i></button>
+                            </div>
+                        </div>
+                        <div class="calendar-streak">
+                            <i class="ph ph-fire"></i> <span id="streak-count">0 Day Streak</span>
+                        </div>
+                    </div>
+                    <div class="calendar-grid-header">
+                        <span>M</span><span>T</span><span>W</span><span>T</span><span>F</span><span>S</span><span>S</span>
+                    </div>
+                    <div id="calendar-days" class="calendar-grid">
+                        <!-- Days injected by JS -->
+                    </div>
+                </div>
+
                 <div id="active-workout-container" class="cards-container" style="margin-bottom: 24px;">
                     <!-- Active workout will be injected here -->
                 </div>
