@@ -296,7 +296,10 @@ class App {
         // Map to M=0 ... S=6. native is Sun=0... Sat=6
         const startDayIndex = firstDay === 0 ? 6 : firstDay - 1;
 
-        // Empty slots
+        // Total cells (6 rows * 7 cols = 42)
+        const totalCells = 42;
+
+        // Empty slots at start
         for (let i = 0; i < startDayIndex; i++) {
             const emptyCell = document.createElement('div');
             emptyCell.className = 'calendar-day empty';
@@ -320,6 +323,16 @@ class App {
             }
 
             daysContainer.appendChild(dayCell);
+        }
+
+        // Fill remaining cells to complete the grid
+        const filledCells = startDayIndex + daysInMonth;
+        const remainingCells = totalCells - filledCells;
+
+        for (let i = 0; i < remainingCells; i++) {
+            const emptyCell = document.createElement('div');
+            emptyCell.className = 'calendar-day empty';
+            daysContainer.appendChild(emptyCell);
         }
 
         this.updateStreak(workoutDates);
@@ -359,127 +372,136 @@ class App {
     }
 
     updateDate() {
-
-        loadProfile(profileId) {
-            this.profileManager.setCurrentProfile(profileId);
-            this.store = new Store(profileId);
-
-            // No blocking prompt. Just go home.
-            // The renderPlansList will handle showing the active workout.
-            this.router.navigate('home');
-
-            console.log(`Loaded Profile: ${profileId}`);
+        const dateEl = document.querySelector('.date-display');
+        if (dateEl) {
+            const options = { weekday: 'long', month: 'short', day: 'numeric' };
+            dateEl.textContent = new Date().toLocaleDateString('en-US', options);
         }
+    }
 
-        setupGlobalListeners() {
-            // Navigation clicks
-            document.querySelectorAll('.nav-item').forEach(btn => {
-                btn.addEventListener('click', (e) => {
-                    const target = btn.dataset.target;
-                    this.router.navigate(target);
-                });
+    loadProfile(profileId) {
+        this.profileManager.setCurrentProfile(profileId);
+        this.store = new Store(profileId);
+
+        // No blocking prompt. Just go home.
+        // The renderPlansList will handle showing the active workout.
+        this.router.navigate('home');
+
+        console.log(`Loaded Profile: ${profileId}`);
+    }
+
+    setupGlobalListeners() {
+        // Navigation clicks
+        document.querySelectorAll('.nav-item').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                const target = btn.dataset.target;
+                this.router.navigate(target);
             });
+        });
 
-            // Route Changes
-            document.addEventListener('routeChanged', (e) => {
-                console.log(`Navigated to ${e.detail.route}`);
-                const route = e.detail.route;
+        // Route Changes
+        document.addEventListener('routeChanged', (e) => {
+            console.log(`Navigated to ${e.detail.route}`);
+            const route = e.detail.route;
 
-                if (route === 'home') this.renderPlansList();
-                if (route === 'history') this.renderHistoryList();
-                if (route === 'settings') this.renderSettings();
-                if (route === 'profile-select') this.renderProfileList();
-            });
+            if (route === 'home') {
+                this.renderPlansList();
+                this.renderCalendar();
+            }
+            if (route === 'history') this.renderHistoryList();
+            if (route === 'settings') this.renderSettings();
+            if (route === 'profile-select') this.renderProfileList();
+        });
 
-            // --- PROFILE & SETTINGS LISTENERS ---
-            document.getElementById('btn-add-profile')?.addEventListener('click', () => {
-                document.getElementById('modal-add-profile').classList.add('active');
-                document.getElementById('new-profile-name').focus();
-            });
+        // --- PROFILE & SETTINGS LISTENERS ---
+        document.getElementById('btn-add-profile')?.addEventListener('click', () => {
+            document.getElementById('modal-add-profile').classList.add('active');
+            document.getElementById('new-profile-name').focus();
+        });
 
-            document.getElementById('btn-cancel-add-profile')?.addEventListener('click', () => {
+        document.getElementById('btn-cancel-add-profile')?.addEventListener('click', () => {
+            document.getElementById('modal-add-profile').classList.remove('active');
+            document.getElementById('new-profile-name').value = '';
+        });
+
+        document.getElementById('btn-confirm-add-profile')?.addEventListener('click', () => {
+            const name = document.getElementById('new-profile-name').value.trim();
+            if (name) {
+                const newProfile = this.profileManager.createProfile(name);
                 document.getElementById('modal-add-profile').classList.remove('active');
                 document.getElementById('new-profile-name').value = '';
-            });
 
-            document.getElementById('btn-confirm-add-profile')?.addEventListener('click', () => {
-                const name = document.getElementById('new-profile-name').value.trim();
-                if (name) {
-                    const newProfile = this.profileManager.createProfile(name);
-                    document.getElementById('modal-add-profile').classList.remove('active');
-                    document.getElementById('new-profile-name').value = '';
-
-                    // If we are in profile select, reload list. If we were forced there, maybe auto-login?
-                    // Let's just reload list and let user click
-                    this.renderProfileList();
-                }
-            });
-
-            document.getElementById('btn-switch-profile')?.addEventListener('click', () => {
-                this.router.navigate('profile-select');
-            });
-
-            document.getElementById('btn-clear-data')?.addEventListener('click', () => {
-                if (confirm('Are you sure you want to delete all workouts and plans for this profile? This cannot be undone.')) {
-                    this.store.clearData();
-                    alert('Data cleared.');
-                    this.renderPlansList(); // Refresh
-                }
-            });
-
-            document.getElementById('btn-delete-profile')?.addEventListener('click', () => {
-                const currentProfile = this.profileManager.getCurrentProfile();
-                if (!currentProfile) return;
-
-                if (confirm(`Are you sure you want to PERMANENTLY DELETE profile "${currentProfile.name}"? This will wipe all data for this user.`)) {
-                    const check = prompt("Type DELETE to confirm:");
-                    if (check === 'DELETE') {
-                        this.profileManager.deleteProfile(currentProfile.id);
-                        // Force reload/reset
-                        location.reload();
-                    }
-                }
-            });
-
-            // --- PLAN EDITOR LISTENERS ---
-
-            document.getElementById('btn-create-plan')?.addEventListener('click', () => this.openPlanEditor());
-            document.getElementById('btn-cancel-plan')?.addEventListener('click', () => this.router.navigate('home'));
-            document.getElementById('btn-add-exercise')?.addEventListener('click', () => this.addExerciseToEditor());
-            document.getElementById('btn-save-plan')?.addEventListener('click', () => this.saveCurrentPlan());
-
-            // --- WORKOUT LISTENERS ---
-            document.getElementById('btn-finish-workout')?.addEventListener('click', () => this.finishWorkout());
-            document.getElementById('btn-discard-workout')?.addEventListener('click', () => this.discardWorkout());
-            document.getElementById('btn-save-exit')?.addEventListener('click', () => {
-                this.router.navigate('home');
-            });
-        }
-
-        setupProfileView() {
-            // Any specific setup for profile view if needed
-        }
-
-        renderProfileList() {
-            const container = document.getElementById('profiles-list');
-            container.innerHTML = '';
-            const profiles = this.profileManager.getProfiles();
-
-            if (profiles.length === 0) {
-                container.innerHTML = '<p class="text-center" style="color:var(--text-secondary);">No profiles found. Create one to start.</p>';
-                return;
+                // If we are in profile select, reload list. If we were forced there, maybe auto-login?
+                // Let's just reload list and let user click
+                this.renderProfileList();
             }
+        });
 
-            profiles.forEach(p => {
-                const el = document.createElement('div');
-                el.className = 'card';
-                el.style.display = 'flex';
-                el.style.alignItems = 'center';
-                el.style.gap = '16px';
-                el.style.cursor = 'pointer';
-                el.onclick = () => this.loadProfile(p.id);
+        document.getElementById('btn-switch-profile')?.addEventListener('click', () => {
+            this.router.navigate('profile-select');
+        });
 
-                el.innerHTML = `
+        document.getElementById('btn-clear-data')?.addEventListener('click', () => {
+            if (confirm('Are you sure you want to delete all workouts and plans for this profile? This cannot be undone.')) {
+                this.store.clearData();
+                alert('Data cleared.');
+                this.renderPlansList(); // Refresh
+            }
+        });
+
+        document.getElementById('btn-delete-profile')?.addEventListener('click', () => {
+            const currentProfile = this.profileManager.getCurrentProfile();
+            if (!currentProfile) return;
+
+            if (confirm(`Are you sure you want to PERMANENTLY DELETE profile "${currentProfile.name}"? This will wipe all data for this user.`)) {
+                const check = prompt("Type DELETE to confirm:");
+                if (check === 'DELETE') {
+                    this.profileManager.deleteProfile(currentProfile.id);
+                    // Force reload/reset
+                    location.reload();
+                }
+            }
+        });
+
+        // --- PLAN EDITOR LISTENERS ---
+
+        document.getElementById('btn-create-plan')?.addEventListener('click', () => this.openPlanEditor());
+        document.getElementById('btn-cancel-plan')?.addEventListener('click', () => this.router.navigate('home'));
+        document.getElementById('btn-add-exercise')?.addEventListener('click', () => this.addExerciseToEditor());
+        document.getElementById('btn-save-plan')?.addEventListener('click', () => this.saveCurrentPlan());
+
+        // --- WORKOUT LISTENERS ---
+        document.getElementById('btn-finish-workout')?.addEventListener('click', () => this.finishWorkout());
+        document.getElementById('btn-discard-workout')?.addEventListener('click', () => this.discardWorkout());
+        document.getElementById('btn-save-exit')?.addEventListener('click', () => {
+            this.router.navigate('home');
+        });
+    }
+
+    setupProfileView() {
+        // Any specific setup for profile view if needed
+    }
+
+    renderProfileList() {
+        const container = document.getElementById('profiles-list');
+        container.innerHTML = '';
+        const profiles = this.profileManager.getProfiles();
+
+        if (profiles.length === 0) {
+            container.innerHTML = '<p class="text-center" style="color:var(--text-secondary);">No profiles found. Create one to start.</p>';
+            return;
+        }
+
+        profiles.forEach(p => {
+            const el = document.createElement('div');
+            el.className = 'card';
+            el.style.display = 'flex';
+            el.style.alignItems = 'center';
+            el.style.gap = '16px';
+            el.style.cursor = 'pointer';
+            el.onclick = () => this.loadProfile(p.id);
+
+            el.innerHTML = `
                 <div style="width:50px; height:50px; border-radius:50%; background:var(--surface-color-light); display:flex; align-items:center; justify-content:center; font-weight:bold; font-size:20px; color:var(--primary-color); border:1px solid var(--primary-color);">
                     ${p.name.charAt(0).toUpperCase()}
                 </div>
@@ -488,48 +510,48 @@ class App {
                     <div style="font-size:12px; color:var(--text-secondary);">Last active: ${new Date().toLocaleDateString()}</div> 
                 </div> 
              `;
-                // Note: "Last active" is fake for now, could add real tracking later
-                container.appendChild(el);
-            });
+            // Note: "Last active" is fake for now, could add real tracking later
+            container.appendChild(el);
+        });
+    }
+
+    renderSettings() {
+        const profile = this.profileManager.getCurrentProfile();
+        if (profile) {
+            document.getElementById('settings-profile-name').textContent = profile.name;
+            document.getElementById('settings-avatar-initials').textContent = profile.name.charAt(0).toUpperCase();
         }
+    }
 
-        renderSettings() {
-            const profile = this.profileManager.getCurrentProfile();
-            if (profile) {
-                document.getElementById('settings-profile-name').textContent = profile.name;
-                document.getElementById('settings-avatar-initials').textContent = profile.name.charAt(0).toUpperCase();
-            }
+    updateDate() {
+        const dateEl = document.querySelector('.date-display');
+        if (dateEl) {
+            const options = { weekday: 'long', month: 'short', day: 'numeric' };
+            dateEl.textContent = new Date().toLocaleDateString('en-US', options);
         }
+    }
 
-        updateDate() {
-            const dateEl = document.querySelector('.date-display');
-            if (dateEl) {
-                const options = { weekday: 'long', month: 'short', day: 'numeric' };
-                dateEl.textContent = new Date().toLocaleDateString('en-US', options);
-            }
-        }
+    // --- PLAN MANAGEMENT ---
 
-        // --- PLAN MANAGEMENT ---
+    renderPlansList() {
+        const plansContainer = document.getElementById('plans-list');
+        const activeContainer = document.getElementById('active-workout-container');
 
-        renderPlansList() {
-            const plansContainer = document.getElementById('plans-list');
-            const activeContainer = document.getElementById('active-workout-container');
+        if (!plansContainer || !activeContainer) return;
+        if (!this.store) return; // Guard
 
-            if (!plansContainer || !activeContainer) return;
-            if (!this.store) return; // Guard
+        plansContainer.innerHTML = '';
+        activeContainer.innerHTML = '';
 
-            plansContainer.innerHTML = '';
-            activeContainer.innerHTML = '';
-
-            // Check for active workout
-            const active = this.store.getActiveWorkout();
-            if (active) {
-                activeContainer.style.display = 'block';
-                const activeCard = document.createElement('div');
-                activeCard.className = 'card';
-                activeCard.style.border = '1px solid var(--primary-color)';
-                activeCard.style.background = 'rgba(0, 240, 255, 0.05)';
-                activeCard.innerHTML = `
+        // Check for active workout
+        const active = this.store.getActiveWorkout();
+        if (active) {
+            activeContainer.style.display = 'block';
+            const activeCard = document.createElement('div');
+            activeCard.className = 'card';
+            activeCard.style.border = '1px solid var(--primary-color)';
+            activeCard.style.background = 'rgba(0, 240, 255, 0.05)';
+            activeCard.innerHTML = `
                 <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
                     <div>
                         <span style="font-size:10px; text-transform:uppercase; letter-spacing:1px; color:var(--primary-color); font-weight:bold;">Active Session</span>
@@ -542,27 +564,27 @@ class App {
                     <button class="btn btn-secondary full-width" onclick="app.finishActiveWorkoutFromHome()">Finish</button>
                 </div>
             `;
-                activeContainer.appendChild(activeCard);
-            } else {
-                activeContainer.style.display = 'none';
-            }
+            activeContainer.appendChild(activeCard);
+        } else {
+            activeContainer.style.display = 'none';
+        }
 
-            const plans = this.store.plans;
+        const plans = this.store.plans;
 
-            if (plans.length === 0) {
-                plansContainer.innerHTML = `
+        if (plans.length === 0) {
+            plansContainer.innerHTML = `
                 <div class="empty-state">
                     <p>No workout plans yet.</p>
                     <button class="btn btn-primary" onclick="app.router.navigate('plan-editor')">Create First Plan</button>
                 </div>
             `;
-                return;
-            }
+            return;
+        }
 
-            plans.forEach(plan => {
-                const card = document.createElement('div');
-                card.className = 'card';
-                card.innerHTML = `
+        plans.forEach(plan => {
+            const card = document.createElement('div');
+            card.className = 'card';
+            card.innerHTML = `
                 <div class="plan-card-header" style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
                     <h3>${plan.name}</h3>
                     <div class="plan-actions">
@@ -576,42 +598,42 @@ class App {
                     ${plan.exercises.map(e => e.name).slice(0, 3).join(', ')}${plan.exercises.length > 3 ? '...' : ''}
                 </div>
             `;
-                plansContainer.appendChild(card);
-            });
-        }
+            plansContainer.appendChild(card);
+        });
+    }
 
-        openPlanEditor(planId = null) {
-            const titleEl = document.querySelector('#view-plan-editor h3'); // We might need to make this ID specific if generic
+    openPlanEditor(planId = null) {
+        const titleEl = document.querySelector('#view-plan-editor h3'); // We might need to make this ID specific if generic
 
-            document.getElementById('editor-exercises-list').innerHTML = '';
+        document.getElementById('editor-exercises-list').innerHTML = '';
 
-            if (planId) {
-                const plan = this.store.getPlan(planId);
-                if (plan) {
-                    document.getElementById('plan-name').value = plan.name;
-                    document.getElementById('plan-name').dataset.editingId = plan.id; // Store ID
+        if (planId) {
+            const plan = this.store.getPlan(planId);
+            if (plan) {
+                document.getElementById('plan-name').value = plan.name;
+                document.getElementById('plan-name').dataset.editingId = plan.id; // Store ID
 
-                    plan.exercises.forEach(ex => {
-                        this.addExerciseToEditor({ name: ex.name, sets: ex.defaultSets });
-                    });
-                }
-            } else {
-                document.getElementById('plan-name').value = '';
-                delete document.getElementById('plan-name').dataset.editingId;
-                this.addExerciseToEditor();
+                plan.exercises.forEach(ex => {
+                    this.addExerciseToEditor({ name: ex.name, sets: ex.defaultSets });
+                });
             }
-
-            this.router.navigate('plan-editor');
+        } else {
+            document.getElementById('plan-name').value = '';
+            delete document.getElementById('plan-name').dataset.editingId;
+            this.addExerciseToEditor();
         }
 
-        addExerciseToEditor(data = { name: '', sets: 3 }) {
-            const container = document.getElementById('editor-exercises-list');
-            const id = generateId();
+        this.router.navigate('plan-editor');
+    }
 
-            const el = document.createElement('div');
-            el.className = 'card exercise-editor-item';
-            el.dataset.id = id;
-            el.innerHTML = `
+    addExerciseToEditor(data = { name: '', sets: 3 }) {
+        const container = document.getElementById('editor-exercises-list');
+        const id = generateId();
+
+        const el = document.createElement('div');
+        el.className = 'card exercise-editor-item';
+        el.dataset.id = id;
+        el.innerHTML = `
             <div class="input-group">
                 <label>Exercise Name</label>
                 <input type="text" class="ex-name" placeholder="e.g. Bench Press" value="${data.name}">
@@ -624,162 +646,162 @@ class App {
                 <button class="btn btn-danger" style="font-size:12px; padding: 6px 12px;" onclick="this.closest('.card').remove()">Remove</button>
             </div>
         `;
-            container.appendChild(el);
+        container.appendChild(el);
+    }
+
+    saveCurrentPlan() {
+        const name = document.getElementById('plan-name').value.trim();
+        if (!name) {
+            alert('Please name your plan.');
+            return;
         }
 
-        saveCurrentPlan() {
-            const name = document.getElementById('plan-name').value.trim();
-            if (!name) {
-                alert('Please name your plan.');
-                return;
+        const exercises = [];
+        document.querySelectorAll('.exercise-editor-item').forEach(el => {
+            const exName = el.querySelector('.ex-name').value.trim();
+            const exSets = parseInt(el.querySelector('.ex-sets').value) || 3;
+
+            if (exName) {
+                exercises.push({
+                    id: generateId(),
+                    name: exName,
+                    defaultSets: exSets
+                });
             }
+        });
 
-            const exercises = [];
-            document.querySelectorAll('.exercise-editor-item').forEach(el => {
-                const exName = el.querySelector('.ex-name').value.trim();
-                const exSets = parseInt(el.querySelector('.ex-sets').value) || 3;
+        if (exercises.length === 0) {
+            alert('Add at least one exercise.');
+            return;
+        }
 
-                if (exName) {
-                    exercises.push({
-                        id: generateId(),
-                        name: exName,
-                        defaultSets: exSets
-                    });
-                }
+        const editingId = document.getElementById('plan-name').dataset.editingId;
+
+        const newPlan = {
+            id: editingId || generateId(),
+            name: name,
+            exercises: exercises,
+            createdAt: new Date().toISOString()
+        };
+
+        if (editingId) {
+            this.store.updatePlan(newPlan);
+        } else {
+            this.store.addPlan(newPlan);
+        }
+
+        this.router.navigate('home');
+    }
+
+    deletePlan(id) {
+        if (confirm('Delete this plan?')) {
+            this.store.deletePlan(id);
+            this.renderPlansList();
+        }
+    }
+
+    // --- WORKOUT SESSION --
+
+    startWorkout(planId) {
+        const plan = this.store.getPlan(planId);
+        if (!plan) return;
+
+        // Start fresh
+        this.currentWorkout = {
+            planId: plan.id,
+            startTime: new Date(),
+            planName: plan.name,
+            exercises: plan.exercises
+        };
+
+        // Initial Save
+        this.store.saveActiveWorkout(this.currentWorkout);
+
+        this.renderWorkoutView();
+    }
+
+    resumeWorkout(savedData) {
+        this.currentWorkout = {
+            ...savedData,
+            startTime: new Date(savedData.startTime) // Restore object
+        };
+        this.renderWorkoutView();
+    }
+
+    redoWorkout(logId) {
+        const log = this.store.history.find(l => l.id === logId);
+        if (!log) return;
+
+        // Convert history log back to "active workout" structure
+        // We need to map the historically performed sets to the "default" values for this session
+        // so they appear pre-filled
+
+        const exercises = log.exercises.map(ex => ({
+            id: generateId(),
+            name: ex.name,
+            defaultSets: ex.sets.length,
+            // We'll store the exact sets to pre-fill active values
+            prefillSets: ex.sets
+        }));
+
+        this.currentWorkout = {
+            planId: log.planId || 'redo', // Might not exist anymore, fine
+            startTime: new Date(),
+            planName: log.planName,
+            exercises: exercises
+        };
+
+        this.store.saveActiveWorkout(this.currentWorkout);
+        this.renderWorkoutView();
+    }
+
+    finishActiveWorkoutFromHome() {
+        const active = this.store.getActiveWorkout();
+        if (active) {
+            this.currentWorkout = active;
+            // Ensure sets are properly formatted if needed, though they should be fine from storage
+            // Just assume they are valid or filter empty ones like in finishWorkout
+            this.finishWorkout();
+        }
+    }
+
+    deleteLog(id) {
+        if (confirm("Are you sure you want to delete this workout history?")) {
+            this.store.deleteWorkoutLog(id);
+            this.renderHistoryList();
+        }
+    }
+
+    renderWorkoutView() {
+        const container = document.getElementById('workout-exercises-list');
+        document.getElementById('workout-title').textContent = this.currentWorkout.planName;
+        document.getElementById('workout-timer').textContent = "00:00";
+
+        container.innerHTML = '';
+
+        this.currentWorkout.exercises.forEach(ex => {
+            const card = document.createElement('div');
+            card.className = 'card workout-exercise-card';
+            card.dataset.id = ex.id;
+            card.dataset.name = ex.name;
+
+            let setsHtml = '';
+            // Determine sets to render: either from prefill (Redo), saved state (Resume), or default (New)
+            const setsToRender = ex.sets || ex.prefillSets || Array(ex.defaultSets || 3).fill({
+                weight: '',
+                reps: '',
+                completed: false
             });
 
-            if (exercises.length === 0) {
-                alert('Add at least one exercise.');
-                return;
-            }
+            setsToRender.forEach((set, i) => {
+                // Clean up data for display (handle 0s or empty strings)
+                const w = (set.weight !== undefined && set.weight !== '') ? set.weight : '';
+                const r = (set.reps !== undefined && set.reps !== '') ? set.reps : '';
+                const c = (set.completed === true);
+                setsHtml += this.generateSetRowHtml(i + 1, w, r, c);
+            });
 
-            const editingId = document.getElementById('plan-name').dataset.editingId;
-
-            const newPlan = {
-                id: editingId || generateId(),
-                name: name,
-                exercises: exercises,
-                createdAt: new Date().toISOString()
-            };
-
-            if (editingId) {
-                this.store.updatePlan(newPlan);
-            } else {
-                this.store.addPlan(newPlan);
-            }
-
-            this.router.navigate('home');
-        }
-
-        deletePlan(id) {
-            if (confirm('Delete this plan?')) {
-                this.store.deletePlan(id);
-                this.renderPlansList();
-            }
-        }
-
-        // --- WORKOUT SESSION --
-
-        startWorkout(planId) {
-            const plan = this.store.getPlan(planId);
-            if (!plan) return;
-
-            // Start fresh
-            this.currentWorkout = {
-                planId: plan.id,
-                startTime: new Date(),
-                planName: plan.name,
-                exercises: plan.exercises
-            };
-
-            // Initial Save
-            this.store.saveActiveWorkout(this.currentWorkout);
-
-            this.renderWorkoutView();
-        }
-
-        resumeWorkout(savedData) {
-            this.currentWorkout = {
-                ...savedData,
-                startTime: new Date(savedData.startTime) // Restore object
-            };
-            this.renderWorkoutView();
-        }
-
-        redoWorkout(logId) {
-            const log = this.store.history.find(l => l.id === logId);
-            if (!log) return;
-
-            // Convert history log back to "active workout" structure
-            // We need to map the historically performed sets to the "default" values for this session
-            // so they appear pre-filled
-
-            const exercises = log.exercises.map(ex => ({
-                id: generateId(),
-                name: ex.name,
-                defaultSets: ex.sets.length,
-                // We'll store the exact sets to pre-fill active values
-                prefillSets: ex.sets
-            }));
-
-            this.currentWorkout = {
-                planId: log.planId || 'redo', // Might not exist anymore, fine
-                startTime: new Date(),
-                planName: log.planName,
-                exercises: exercises
-            };
-
-            this.store.saveActiveWorkout(this.currentWorkout);
-            this.renderWorkoutView();
-        }
-
-        finishActiveWorkoutFromHome() {
-            const active = this.store.getActiveWorkout();
-            if (active) {
-                this.currentWorkout = active;
-                // Ensure sets are properly formatted if needed, though they should be fine from storage
-                // Just assume they are valid or filter empty ones like in finishWorkout
-                this.finishWorkout();
-            }
-        }
-
-        deleteLog(id) {
-            if (confirm("Are you sure you want to delete this workout history?")) {
-                this.store.deleteWorkoutLog(id);
-                this.renderHistoryList();
-            }
-        }
-
-        renderWorkoutView() {
-            const container = document.getElementById('workout-exercises-list');
-            document.getElementById('workout-title').textContent = this.currentWorkout.planName;
-            document.getElementById('workout-timer').textContent = "00:00";
-
-            container.innerHTML = '';
-
-            this.currentWorkout.exercises.forEach(ex => {
-                const card = document.createElement('div');
-                card.className = 'card workout-exercise-card';
-                card.dataset.id = ex.id;
-                card.dataset.name = ex.name;
-
-                let setsHtml = '';
-                // Determine sets to render: either from prefill (Redo), saved state (Resume), or default (New)
-                const setsToRender = ex.sets || ex.prefillSets || Array(ex.defaultSets || 3).fill({
-                    weight: '',
-                    reps: '',
-                    completed: false
-                });
-
-                setsToRender.forEach((set, i) => {
-                    // Clean up data for display (handle 0s or empty strings)
-                    const w = (set.weight !== undefined && set.weight !== '') ? set.weight : '';
-                    const r = (set.reps !== undefined && set.reps !== '') ? set.reps : '';
-                    const c = (set.completed === true);
-                    setsHtml += this.generateSetRowHtml(i + 1, w, r, c);
-                });
-
-                card.innerHTML = `
+            card.innerHTML = `
                 <div class="workout-card-header" style="margin-bottom:12px; display:flex; justify-content:space-between; align-items:center;">
                     <h3>${ex.name}</h3>
                 </div>
@@ -799,61 +821,61 @@ class App {
                     </button>
                 </div>
             `;
-                container.appendChild(card);
-            });
+            container.appendChild(card);
+        });
 
-            // Attach auto-save listeners
-            container.querySelectorAll('input').forEach(input => {
-                input.addEventListener('input', () => this.saveWorkoutState());
-            });
+        // Attach auto-save listeners
+        container.querySelectorAll('input').forEach(input => {
+            input.addEventListener('input', () => this.saveWorkoutState());
+        });
 
-            this.router.navigate('workout');
-        }
+        this.router.navigate('workout');
+    }
 
-        saveWorkoutState() {
-            if (!this.currentWorkout) return;
+    saveWorkoutState() {
+        if (!this.currentWorkout) return;
 
-            // Scrape DOM for current state
-            const exercises = [];
-            const cards = document.querySelectorAll('.workout-exercise-card');
+        // Scrape DOM for current state
+        const exercises = [];
+        const cards = document.querySelectorAll('.workout-exercise-card');
 
-            cards.forEach(card => {
-                const exerciseName = card.dataset.name;
-                const id = card.dataset.id;
-                const sets = [];
+        cards.forEach(card => {
+            const exerciseName = card.dataset.name;
+            const id = card.dataset.id;
+            const sets = [];
 
-                card.querySelectorAll('.set-row').forEach(row => {
-                    const weight = row.querySelector('.set-weight').value;
-                    const reps = row.querySelector('.set-reps').value;
-                    const completed = row.classList.contains('completed');
-                    // Save raw values to restore exactly
-                    sets.push({
-                        weight,
-                        reps,
-                        completed
-                    });
-                });
-
-                exercises.push({
-                    id: id,
-                    name: exerciseName,
-                    sets: sets
+            card.querySelectorAll('.set-row').forEach(row => {
+                const weight = row.querySelector('.set-weight').value;
+                const reps = row.querySelector('.set-reps').value;
+                const completed = row.classList.contains('completed');
+                // Save raw values to restore exactly
+                sets.push({
+                    weight,
+                    reps,
+                    completed
                 });
             });
 
-            // Update memory
-            this.currentWorkout.exercises = exercises;
+            exercises.push({
+                id: id,
+                name: exerciseName,
+                sets: sets
+            });
+        });
 
-            // Save to disk
-            this.store.saveActiveWorkout(this.currentWorkout);
-        }
+        // Update memory
+        this.currentWorkout.exercises = exercises;
 
-        generateSetRowHtml(setNumber, weight = '', reps = '', completed = false) {
-            const completedClass = completed ? 'completed' : '';
-            const btnClass = completed ? 'btn-success' : 'btn-secondary';
-            const icon = completed ? 'ph-check-bold' : 'ph-check';
+        // Save to disk
+        this.store.saveActiveWorkout(this.currentWorkout);
+    }
 
-            return `
+    generateSetRowHtml(setNumber, weight = '', reps = '', completed = false) {
+        const completedClass = completed ? 'completed' : '';
+        const btnClass = completed ? 'btn-success' : 'btn-secondary';
+        const icon = completed ? 'ph-check-bold' : 'ph-check';
+
+        return `
             <div class="set-row ${completedClass}" style="display:grid; grid-template-columns: 30px 1fr 1fr 30px 40px; gap:8px; margin-bottom:8px; align-items:center;">
                 <span class="set-num" style="color:var(--text-secondary); font-weight:600; text-align:center;">${setNumber}</span>
                 <input type="number" class="set-weight" placeholder="kg" value="${weight}">
@@ -864,120 +886,131 @@ class App {
                 <button class="btn btn-icon" style="color:var(--danger-color); font-size:20px;" onclick="app.removeSet(this)"><i class="ph ph-x"></i></button>
             </div>
         `;
+    }
+
+    toggleSetComplete(btn) {
+        const row = btn.closest('.set-row');
+        const wasCompleted = row.classList.contains('completed');
+
+        if (wasCompleted) {
+            row.classList.remove('completed');
+            btn.classList.remove('btn-success');
+            btn.classList.add('btn-secondary');
+            btn.querySelector('i').classList.replace('ph-check-bold', 'ph-check');
+        } else {
+            row.classList.add('completed');
+            btn.classList.remove('btn-secondary');
+            btn.classList.add('btn-success');
+            btn.querySelector('i').classList.replace('ph-check', 'ph-check-bold');
         }
 
-        toggleSetComplete(btn) {
-            const row = btn.closest('.set-row');
-            const wasCompleted = row.classList.contains('completed');
+        // Explicit Save
+        this.saveWorkoutState();
+    }
 
-            if (wasCompleted) {
-                row.classList.remove('completed');
-                btn.classList.remove('btn-success');
-                btn.classList.add('btn-secondary');
-                btn.querySelector('i').classList.replace('ph-check-bold', 'ph-check');
-            } else {
-                row.classList.add('completed');
-                btn.classList.remove('btn-secondary');
-                btn.classList.add('btn-success');
-                btn.querySelector('i').classList.replace('ph-check', 'ph-check-bold');
-            }
+    removeSet(btn) {
+        btn.closest('.set-row').remove();
+        this.saveWorkoutState(); // Trigger save on structural change
+    }
 
-            // Explicit Save
-            this.saveWorkoutState();
-        }
+    addSetToExercise(btn) {
+        const setsList = btn.previousElementSibling;
+        const currentSets = setsList.querySelectorAll('.set-row').length;
+        const html = this.generateSetRowHtml(currentSets + 1);
+        setsList.insertAdjacentHTML('beforeend', html);
 
-        removeSet(btn) {
-            btn.closest('.set-row').remove();
-            this.saveWorkoutState(); // Trigger save on structural change
-        }
+        // Attach listener to new inputs
+        const newRow = setsList.lastElementChild;
+        newRow.querySelectorAll('input').forEach(i => i.addEventListener('input', () => this.saveWorkoutState()));
 
-        addSetToExercise(btn) {
-            const setsList = btn.previousElementSibling;
-            const currentSets = setsList.querySelectorAll('.set-row').length;
-            const html = this.generateSetRowHtml(currentSets + 1);
-            setsList.insertAdjacentHTML('beforeend', html);
+        this.saveWorkoutState();
+    }
 
-            // Attach listener to new inputs
-            const newRow = setsList.lastElementChild;
-            newRow.querySelectorAll('input').forEach(i => i.addEventListener('input', () => this.saveWorkoutState()));
+    finishWorkout() {
+        if (!this.currentWorkout) return;
 
-            this.saveWorkoutState();
-        }
+        const log = {
+            id: generateId(),
+            planId: this.currentWorkout.planId,
+            planName: this.currentWorkout.planName,
+            date: new Date().toISOString(),
+            duration: Math.round((new Date() - this.currentWorkout.startTime) / 60000), // minutes
+            exercises: []
+        };
 
-        finishWorkout() {
-            if (!this.currentWorkout) return;
+        const cards = document.querySelectorAll('.workout-exercise-card');
+        cards.forEach(card => {
+            const exerciseName = card.dataset.name;
+            const sets = [];
 
-            const log = {
-                id: generateId(),
-                planId: this.currentWorkout.planId,
-                planName: this.currentWorkout.planName,
-                date: new Date().toISOString(),
-                duration: Math.round((new Date() - this.currentWorkout.startTime) / 60000), // minutes
-                exercises: []
-            };
+            card.querySelectorAll('.set-row').forEach(row => {
+                const weight = parseFloat(row.querySelector('.set-weight').value);
+                const reps = parseFloat(row.querySelector('.set-reps').value);
 
-            const cards = document.querySelectorAll('.workout-exercise-card');
-            cards.forEach(card => {
-                const exerciseName = card.dataset.name;
-                const sets = [];
-
-                card.querySelectorAll('.set-row').forEach(row => {
-                    const weight = parseFloat(row.querySelector('.set-weight').value);
-                    const reps = parseFloat(row.querySelector('.set-reps').value);
-
-                    if (!isNaN(weight) || !isNaN(reps)) {
-                        sets.push({ weight: weight || 0, reps: reps || 0 });
-                    }
-                });
-
-                if (sets.length > 0) {
-                    log.exercises.push({
-                        name: exerciseName,
-                        sets: sets
-                    });
+                if (!isNaN(weight) || !isNaN(reps)) {
+                    sets.push({ weight: weight || 0, reps: reps || 0 });
                 }
             });
 
+            if (sets.length > 0) {
+                log.exercises.push({
+                    name: exerciseName,
+                    sets: sets
+                });
+            }
+        });
+
+        if (log.exercises.length > 0) {
             this.store.addWorkoutLog(log);
             this.store.clearActiveWorkout(); // DONE
             this.currentWorkout = null;
-            this.router.navigate('history');
+
+            // Render Calendar to show new dot!
+            this.renderCalendar();
+
+            this.router.navigate('home'); // Go to home to see the streak/calendar update!
+        } else {
+            this.store.clearActiveWorkout();
+            this.currentWorkout = null;
+            this.router.navigate('home');
         }
+    }
 
-        discardWorkout() {
-            if (confirm('Discard current workout? Data will be lost.')) {
-                this.store.clearActiveWorkout(); // CLEARED
-                this.currentWorkout = null;
-                this.router.navigate('home');
-            }
+    discardWorkout() {
+        if (confirm('Discard current workout? Data will be lost.')) {
+            this.store.clearActiveWorkout(); // CLEARED
+            this.currentWorkout = null;
+            this.renderCalendar(); // Just in case
+            this.router.navigate('home');
         }
+    }
 
-        // --- HISTORY ---
+    // --- HISTORY ---
 
-        renderHistoryList() {
-            const container = document.getElementById('history-list');
-            if (!container) return;
-            if (!this.store) return;
+    renderHistoryList() {
+        const container = document.getElementById('history-list');
+        if (!container) return;
+        if (!this.store) return;
 
-            container.innerHTML = '';
-            const history = this.store.history;
+        container.innerHTML = '';
+        const history = this.store.history;
 
-            if (history.length === 0) {
-                container.innerHTML = `
+        if (history.length === 0) {
+            container.innerHTML = `
                 <div class="empty-state">
                     <p>No completed workouts yet.</p>
                 </div>
             `;
-                return;
-            }
+            return;
+        }
 
-            history.forEach(log => {
-                const dateStr = new Date(log.date).toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' });
+        history.forEach(log => {
+            const dateStr = new Date(log.date).toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' });
 
-                let exercisesHtml = '';
-                log.exercises.forEach(ex => {
-                    const recommendation = this.getRecommendation(ex.name, ex.sets);
-                    exercisesHtml += `
+            let exercisesHtml = '';
+            log.exercises.forEach(ex => {
+                const recommendation = this.getRecommendation(ex.name, ex.sets);
+                exercisesHtml += `
                     <div class="history-exercise-item" style="margin-top:8px; border-top:1px solid rgba(255,255,255,0.05); padding-top:8px;">
                         <div style="display:flex; justify-content:space-between; font-size:14px; margin-bottom:4px;">
                             <span style="color:var(--primary-color);">${ex.name}</span>
@@ -989,16 +1022,16 @@ class App {
                         ${recommendation ? `<div style="font-size:11px; color:var(--success-color); margin-top:4px;">💡 ${recommendation}</div>` : ''}
                     </div>
                 `;
-                });
+            });
 
-                const card = document.createElement('div');
-                card.className = 'card';
-                card.onclick = (e) => {
-                    // Prevent triggering if clicked on inner elements like specific buttons if we had them
-                    // For now, whole card clickable for "Redo" or just add a button
-                };
+            const card = document.createElement('div');
+            card.className = 'card';
+            card.onclick = (e) => {
+                // Prevent triggering if clicked on inner elements like specific buttons if we had them
+                // For now, whole card clickable for "Redo" or just add a button
+            };
 
-                card.innerHTML = `
+            card.innerHTML = `
                 <div class="history-card-header" style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
                     <div>
                         <h3>${log.planName}</h3>
@@ -1015,28 +1048,28 @@ class App {
                      </button>
                 </div>
             `;
-                container.appendChild(card);
-            });
-        }
-
-        getRecommendation(exerciseName, currentSets) {
-            if (!currentSets || currentSets.length === 0) return null;
-
-            let maxWeight = 0;
-            currentSets.forEach(s => {
-                if (s.weight > maxWeight) maxWeight = s.weight;
-            });
-
-            const maxWeightSet = currentSets.find(s => s.weight === maxWeight);
-            if (maxWeightSet && maxWeightSet.reps >= 12) {
-                return `Strong! Try ${maxWeight + 2.5}kg next time.`;
-            }
-            if (maxWeightSet && maxWeightSet.reps < 6) {
-                return `Focus on form and build to 8 reps.`;
-            }
-            return null;
-        }
+            container.appendChild(card);
+        });
     }
 
-    // Global App Instance
-    const app = new App();
+    getRecommendation(exerciseName, currentSets) {
+        if (!currentSets || currentSets.length === 0) return null;
+
+        let maxWeight = 0;
+        currentSets.forEach(s => {
+            if (s.weight > maxWeight) maxWeight = s.weight;
+        });
+
+        const maxWeightSet = currentSets.find(s => s.weight === maxWeight);
+        if (maxWeightSet && maxWeightSet.reps >= 12) {
+            return `Strong! Try ${maxWeight + 2.5}kg next time.`;
+        }
+        if (maxWeightSet && maxWeightSet.reps < 6) {
+            return `Focus on form and build to 8 reps.`;
+        }
+        return null;
+    }
+}
+
+// Global App Instance
+const app = new App();
