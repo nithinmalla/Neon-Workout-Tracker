@@ -1,0 +1,248 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Noveo</title>
+    <meta name="description" content="A futuristic, mobile-first workout tracker.">
+    <meta name="theme-color" content="#0a0a0a">
+    <link rel="manifest" href="manifest.json">
+    <link rel="icon" href="icon.png" type="image/png">
+    <link rel="apple-touch-icon" href="icon.png">
+
+    <!-- Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link
+        href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Outfit:wght@400;500;700&display=swap"
+        rel="stylesheet">
+
+    <!-- Icons (Phosphor Icons) -->
+    <script src="https://unpkg.com/@phosphor-icons/web"></script>
+
+    <link rel="stylesheet" href="style.css">
+</head>
+
+<body>
+
+    <!-- Main App Container -->
+    <main id="app">
+
+        <!-- HEADER -->
+        <header class="app-header">
+            <h1 class="logo">NOV<span class="accent">EO</span></h1>
+            <div id="header-actions">
+                <!-- Dynamic buttons based on view -->
+            </div>
+        </header>
+
+        <!-- VIEW: HOME (Workout Plans) -->
+        <section id="view-home" class="view active">
+            <div class="view-content">
+                <div class="welcome-banner">
+                    <h2>Ready to train?</h2>
+                    <p class="date-display">Today</p>
+                </div>
+
+                <!-- Calendar Widget -->
+                <div id="calendar-widget" class="card" style="margin-bottom: 24px;">
+                    <div class="calendar-header">
+                        <div class="calendar-nav">
+                            <span id="calendar-month-year">January 2026</span>
+                            <div class="calendar-controls">
+                                <button id="prev-month" class="btn-icon-sm"><i class="ph ph-caret-left"></i></button>
+                                <button id="next-month" class="btn-icon-sm"><i class="ph ph-caret-right"></i></button>
+                            </div>
+                        </div>
+                        <div class="calendar-streak">
+                            <i class="ph ph-fire"></i> <span id="streak-count">0 Day Streak</span>
+                        </div>
+                    </div>
+                    <div class="calendar-grid-header">
+                        <span>M</span><span>T</span><span>W</span><span>T</span><span>F</span><span>S</span><span>S</span>
+                    </div>
+                    <div id="calendar-days" class="calendar-grid">
+                        <!-- Days injected by JS -->
+                    </div>
+                </div>
+
+                <div id="active-workout-container" class="cards-container" style="margin-bottom: 24px;">
+                    <!-- Active workout will be injected here -->
+                </div>
+
+                <div class="section-header">
+                    <h3>Your Plans</h3>
+                    <button class="btn btn-icon" id="btn-create-plan" aria-label="Create Plan">
+                        <i class="ph ph-plus"></i>
+                    </button>
+                </div>
+
+                <div id="plans-list" class="cards-container">
+                    <!-- Plans will be injected here -->
+                    <div class="empty-state">
+                        <p>No workout plans yet.</p>
+                        <button class="btn btn-primary" onclick="app.router.navigate('plan-editor')">Create First
+                            Plan</button>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- VIEW: PLAN EDITOR -->
+        <section id="view-plan-editor" class="view">
+            <div class="view-content">
+                <div class="input-group">
+                    <label for="plan-name">Plan Name</label>
+                    <input type="text" id="plan-name" placeholder="e.g., Push Day" autocomplete="off">
+                </div>
+
+                <div class="section-header">
+                    <h3>Exercises</h3>
+                </div>
+
+                <div id="editor-exercises-list" class="cards-container">
+                    <!-- Exercises in plan being edited -->
+                </div>
+
+                <button class="btn btn-outline full-width" id="btn-add-exercise">
+                    <i class="ph ph-plus"></i> Add Exercise
+                </button>
+            </div>
+
+            <div class="floating-action-bar">
+                <button class="btn btn-secondary" id="btn-cancel-plan">Cancel</button>
+                <button class="btn btn-primary" id="btn-save-plan">Save Plan</button>
+            </div>
+        </section>
+
+        <!-- VIEW: WORKOUT SESSION -->
+        <section id="view-workout" class="view">
+            <div class="view-content">
+                <!-- Header with timer maybe? -->
+                <div class="workout-header">
+                    <h2 id="workout-title">Push Day</h2>
+                    <div class="workout-meta">
+                        <span id="workout-timer">00:00</span>
+                    </div>
+                </div>
+
+                <div id="workout-exercises-list" class="cards-container">
+                    <!-- Active Exercises -->
+                </div>
+            </div>
+
+            <div class="floating-action-bar">
+                <button class="btn btn-secondary" id="btn-save-exit">Save & Exit</button>
+                <div style="flex:1; display:flex; gap:8px;">
+                    <button class="btn btn-danger" id="btn-discard-workout" style="flex:1;">Discard</button>
+                    <button class="btn btn-success" id="btn-finish-workout" style="flex:1;">Finish</button>
+                </div>
+            </div>
+        </section>
+
+        <!-- VIEW: PROFILE SELECT -->
+        <section id="view-profile-select" class="view" style="z-index: 100;">
+            <div class="view-content"
+                style="display:flex; flex-direction:column; justify-content:center; min-height:80vh;">
+                <div class="text-center" style="margin-bottom:32px;">
+                    <h2 class="logo" style="font-size:32px; margin-bottom:8px;">NOV<span class="accent">EO</span>
+                    </h2>
+                    <p style="color:var(--text-secondary);">Who is working out?</p>
+                </div>
+
+                <div id="profiles-list" class="cards-container">
+                    <!-- Profiles will be injected here -->
+                </div>
+
+                <button class="btn btn-outline full-width" id="btn-add-profile" style="margin-top:16px;">
+                    <i class="ph ph-plus"></i> Add Profile
+                </button>
+            </div>
+            <!-- Add Profile Modal (Simplistic Overlay) -->
+            <div id="modal-add-profile" class="modal">
+                <div class="modal-content card">
+                    <h3>New Profile</h3>
+                    <div class="input-group">
+                        <label>Name</label>
+                        <input type="text" id="new-profile-name" placeholder="e.g. John Doe">
+                    </div>
+                    <div style="display:flex; gap:8px; margin-top:16px;">
+                        <button class="btn btn-secondary full-width" id="btn-cancel-add-profile">Cancel</button>
+                        <button class="btn btn-primary full-width" id="btn-confirm-add-profile">Create</button>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- VIEW: SETTINGS -->
+        <section id="view-settings" class="view">
+            <div class="view-content">
+                <div class="section-header">
+                    <h3>Settings</h3>
+                </div>
+
+                <div class="card">
+                    <div class="setting-item" style="display:flex; align-items:center; gap:12px; margin-bottom:16px;">
+                        <div class="avatar-placeholder"
+                            style="width:40px; height:40px; border-radius:50%; background:var(--primary-color); display:flex; align-items:center; justify-content:center; color:black; font-weight:bold;">
+                            <span id="settings-avatar-initials">U</span>
+                        </div>
+                        <div>
+                            <div id="settings-profile-name" style="font-weight:600; font-size:16px;">User</div>
+                            <div style="font-size:12px; color:var(--text-secondary);">Current Profile</div>
+                        </div>
+                    </div>
+                    <button class="btn btn-outline full-width" id="btn-switch-profile">Switch Profile</button>
+                </div>
+
+                <div class="section-header" style="margin-top:24px;">
+                    <h3>Data</h3>
+                </div>
+                <div class="card">
+                    <button class="btn btn-danger full-width" id="btn-clear-data" style="margin-bottom: 12px;">Clear
+                        Current Profile Data</button>
+                    <button class="btn btn-outline full-width" id="btn-delete-profile"
+                        style="color:var(--danger-color); border-color:var(--danger-color);">Delete Profile</button>
+                </div>
+
+                <div style="margin-top:32px; text-align:center; color:var(--text-secondary); font-size:12px;">
+                    <p>Noveo v1.0.0</p>
+                </div>
+            </div>
+        </section>
+
+        <!-- VIEW: HISTORY -->
+        <section id="view-history" class="view">
+            <div class="view-content">
+                <div class="section-header">
+                    <h3>History</h3>
+                </div>
+                <div id="history-list" class="cards-container">
+                    <!-- History usage -->
+                </div>
+            </div>
+        </section>
+
+    </main>
+
+    <!-- BOTTOM NAVIGATION -->
+    <nav class="bottom-nav">
+        <button class="nav-item active" data-target="home">
+            <i class="ph ph-barbell"></i>
+            <span>Workouts</span>
+        </button>
+        <button class="nav-item" data-target="history">
+            <i class="ph ph-clock-counter-clockwise"></i>
+            <span>History</span>
+        </button>
+        <button class="nav-item" data-target="settings">
+            <i class="ph ph-gear"></i>
+            <span>Settings</span>
+        </button>
+    </nav>
+
+    <script src="script.js"></script>
+</body>
+
+</html>
