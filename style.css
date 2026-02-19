@@ -1,8 +1,8 @@
 :root {
     /* Colors */
-    --bg-color: #151515;
-    --surface-color: #202020;
-    --surface-color-light: #2C2C2C;
+    --bg-color: #000000;
+    --surface-color: #000000;
+    --surface-color-light: #000000;
     --text-primary: #ffffff;
     --text-secondary: #a0a0a0;
 
@@ -81,7 +81,7 @@ main {
 
 /* Header */
 .app-header {
-    background-color: rgba(10, 10, 10, 0.95);
+    background-color: rgba(0, 0, 0, 0.95);
     backdrop-filter: blur(10px);
     padding: var(--spacing-md) var(--spacing-lg);
     display: flex;
@@ -131,7 +131,8 @@ main {
     background-color: var(--surface-color);
     border-radius: var(--border-radius-lg);
     padding: var(--spacing-md);
-    border: 1px solid rgba(255, 255, 255, 0.05);
+    border: 1px solid var(--primary-color);
+    box-shadow: 0 0 5px rgba(147, 3, 46, 0.2);
     transition: transform 0.2s, box-shadow 0.2s;
 }
 
@@ -172,7 +173,7 @@ main {
 .btn-secondary {
     background-color: var(--surface-color-light);
     color: var(--text-primary);
-    border: 1px solid rgba(255, 255, 255, 0.1);
+    border: 1px solid var(--primary-color);
 }
 
 .btn-outline {
@@ -208,7 +209,7 @@ main {
 input {
     width: 100%;
     background-color: var(--surface-color-light);
-    border: 1px solid rgba(255, 255, 255, 0.1);
+    border: 1px solid var(--primary-color);
     border-radius: var(--border-radius-md);
     padding: 12px var(--spacing-md);
     color: var(--text-primary);
@@ -242,7 +243,7 @@ input:focus {
     width: 90%;
     max-width: 400px;
     height: 64px;
-    background-color: rgba(20, 20, 20, 0.85);
+    background-color: rgba(0, 0, 0, 0.85);
     backdrop-filter: blur(12px);
     -webkit-backdrop-filter: blur(12px);
     display: flex;
